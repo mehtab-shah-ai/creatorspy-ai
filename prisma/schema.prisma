@@ -1,0 +1,136 @@
+// E-commerce Competitor Intelligence Agent — Prisma schema
+// SQLite-only (per user spec — no PostgreSQL/MySQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- AUTH ----------
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  analysisRuns AnalysisRun[]
+}
+
+// ---------- ANALYSIS RUNS ----------
+
+model AnalysisRun {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        String           @default("pending") // pending | running | completed | failed
+  current_node  String?          // which LangGraph node is currently executing
+  progress      Float            @default(0) // 0..1
+  yourProductInput String       // raw user input (link or name)
+  competitorInputs String       // JSON array of competitor inputs (links or "auto")
+  autoFind      Boolean         @default(false)
+  totalCost     Float            @default(0) // USD
+  totalLatencyMs Int             @default(0)
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+  completedAt   DateTime?
+
+  products       Product[]
+  crossSourceFlags CrossSourceFlag[]
+  insights       Insight[]
+  nodeLogs      NodeLog[]
+}
+
+// ---------- PRODUCTS ----------
+
+model Product {
+  id            String          @id @default(cuid())
+  runId        String
+  run           AnalysisRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sourceUrl     String?
+  platform      String?         // amazon | flipkart | unknown
+  role          String          // your_product | competitor
+  name          String?
+  asin          String?         // Amazon ASIN if extractable
+  price         Float?
+  currency      String?
+  rating        Float?
+  reviewCount   Int             @default(0)
+  rawDataJson   String          // raw scraped data (JSON string for SQLite compatibility)
+  cachedUntil   DateTime?       // 48h TTL
+  dataQuality   String          @default("full") // full | partial | limited
+  errorMessage  String?
+
+  reviewClusters ReviewCluster[]
+
+  @@index([runId])
+  @@index([asin])
+}
+
+// ---------- REVIEW CLUSTERS ----------
+
+model ReviewCluster {
+  id             String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  aspect        String   // e.g. "battery life", "build quality", "value for money"
+  sentiment     String   // positive | negative | mixed | neutral
+  frequency     Int      // how many reviews in this cluster
+  exampleQuotesJson String // JSON string of array<string>
+  confidence    Float    @default(0.8) // 0..1 — from labeling agent
+  sourceBreakdownJson String? // JSON: { marketplace: number, reddit: number, blog: number }
+  createdAt     DateTime @default(now())
+
+  @@index([productId])
+}
+
+// ---------- CROSS-SOURCE VERIFICATION FLAGS ----------
+
+model CrossSourceFlag {
+  id                   String      @id @default(cuid())
+  runId               String
+  run                 AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  aspect              String
+  marketplaceSentiment String       // positive | negative | mixed | neutral
+  organicSentiment    String       // positive | negative | mixed | neutral
+  disagreementNote    String
+  severity            String       @default("info") // info | warning | critical
+  createdAt           DateTime     @default(now())
+
+  @@index([runId])
+}
+
+// ---------- INSIGHTS (FINAL VERDICT) ----------
+
+model Insight {
+  id           String      @id @default(cuid())
+  runId       String
+  run         AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  verdictText String      // synthesized final verdict
+  confidence  Float       @default(0.8)
+  opportunitiesJson String? // JSON: array<{title, rationale, impact}>
+  generatedAt DateTime   @default(now())
+}
+
+// ---------- NODE LOGS (COST/LATENCY TELEMETRY) ----------
+
+model NodeLog {
+  id           String      @id @default(cuid())
+  runId       String
+  run         AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeName    String
+  cost        Float       @default(0) // USD for this node
+  latencyMs   Int         @default(0)
+  status      String      @default("ok") // ok | error | partial | skipped
+  errorMessage String?
+  metadataJson String?    // arbitrary JSON: token counts, cache hits, etc.
+  startedAt   DateTime    @default(now())
+  completedAt DateTime?
+
+  @@index([runId])
+}
