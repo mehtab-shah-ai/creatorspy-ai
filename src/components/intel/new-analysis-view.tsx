@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import { useAuth, useUI } from "@/lib/store";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -137,7 +136,7 @@ export function NewAnalysisView() {
             <ArrowLeft className="w-4 h-4 mr-1" /> Back
           </Button>
           <div className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="ClarifyAI" width={28} height={28} />
+            <img src="/logo.svg" alt="ClarifyAI" width={28} height={28} />
             <span className="font-display font-semibold text-sm hidden md:block">ClarifyAI</span>
           </div>
         </div>

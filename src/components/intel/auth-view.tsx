@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import { useAuth, useUI } from "@/lib/store";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -109,7 +108,7 @@ export function AuthView() {
         {/* Top bar */}
         <header className="px-5 md:px-10 py-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo.svg" alt="ClarifyAI" width={36} height={36} />
+            <img src="/logo.svg" alt="ClarifyAI" width={36} height={36} />
             <div className="flex items-baseline gap-1.5">
               <span className="font-display font-semibold text-lg tracking-tight">ClarifyAI</span>
             </div>
@@ -142,15 +141,31 @@ export function AuthView() {
                 AI-Powered Competitive Intelligence Platform
               </motion.div>
 
+              {/* PAIN — the problem people feel */}
+              <div className="mb-4">
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.15 }}
+                  className="text-base md:text-lg text-muted-foreground leading-relaxed"
+                >
+                  400 reviews. 6 Reddit threads. 4 blog posts. 3 competitors.
+                  That's <span className="text-foreground font-medium">two full days</span> of reading
+                  just to figure out if your product is actually better.
+                </motion.p>
+              </div>
+
+              {/* SOLUTION — what we do */}
               <h1 className="font-display font-bold text-4xl md:text-5xl lg:text-[3.4rem] tracking-tight leading-[1.05]">
-                Stop guessing what people think.<br />
-                <span className="text-accent">Know in 30 seconds.</span>
+                We read all of it.<br />
+                <span className="text-accent">You get the truth in 60 seconds.</span>
               </h1>
 
               <p className="mt-5 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
-                Paste a product link and we'll read every review, cross-check it against
-                Reddit and blogs, and tell you exactly what people love, what they wish was
-                better, and where you can win — side by side with your competitors.
+                Paste your product link. ClarifyAI reads every review, cross-checks
+                what people say on Reddit and blogs, and tells you — in plain English
+                — what people love, what they wish was better, and where you can beat
+                your competitors. Side by side. No 400-tab marathon required.
               </p>
 
               {/* Three simple steps */}

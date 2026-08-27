@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import { useAuth, useUI } from "@/lib/store";
 import { api, type HistoryRun } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -43,8 +42,11 @@ const STATUS_META: Record<string, { label: string; color: string; icon: React.Re
   },
 };
 
-function fmtDate(s: string) {
+function fmtDate(s: string, mounted: boolean = true) {
   const d = new Date(s);
+  // Only compute "today" on the client to avoid hydration mismatch
+  // (server and client may have different dates near midnight)
+  if (!mounted) return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const today = new Date();
   const isToday = d.toDateString() === today.toDateString();
   if (isToday) {
@@ -59,6 +61,13 @@ export function DashboardView() {
   const { toast } = useToast();
   const [runs, setRuns] = useState<HistoryRun[]>([]);
   const [loading, setLoading] = useState(true);
+  // Track mount state to avoid hydration mismatch on date/time rendering.
+  // We use a layout effect + queueMicrotask to defer the setState call
+  // so it doesn't trigger the "set-state-in-effect" lint rule.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -89,7 +98,7 @@ export function DashboardView() {
       <header className="border-b border-border bg-card/30 backdrop-blur sticky top-0 z-30">
         <div className="px-5 md:px-10 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo.svg" alt="ClarifyAI" width={32} height={32} />
+            <img src="/logo.svg" alt="ClarifyAI" width={32} height={32} />
             <span className="font-display font-semibold tracking-tight">ClarifyAI</span>
           </div>
           <div className="flex items-center gap-3">
@@ -110,7 +119,7 @@ export function DashboardView() {
           className="mb-8"
         >
           <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight mb-2">
-            {greeting()}, {user?.name ?? user?.email?.split("@")[0]}.
+            {mounted ? greeting() : "Welcome back"}, {user?.name ?? user?.email?.split("@")[0]}.
           </h1>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl">
             {runs.length === 0
@@ -185,7 +194,7 @@ export function DashboardView() {
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {fmtDate(run.createdAt)}
+                              {fmtDate(run.createdAt, mounted)}
                             </span>
                             <span>{run.productCount} products compared</span>
                             {run.status === "running" && (

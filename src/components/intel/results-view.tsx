@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { useAuth, useUI } from "@/lib/store";
 import { api } from "@/lib/api-client";
 import type { AnalysisResultDTO, RunStatusDTO } from "@/lib/types";
@@ -130,7 +129,7 @@ export function ResultsView() {
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to reports
           </Button>
           <div className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="ClarifyAI" width={28} height={28} />
+            <img src="/logo.svg" alt="ClarifyAI" width={28} height={28} />
             <span className="font-display font-semibold text-sm hidden md:block">ClarifyAI</span>
           </div>
         </div>
