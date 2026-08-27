@@ -1,49 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { getUserFromRequest } from "@/lib/auth";
-import { isDemoMode } from "@/lib/config";
 import { z } from "zod";
 
-// Lazy-load the graph so Turbopack can code-split it (reduces memory pressure
-// during dev compile — the full workflow + all agents/services only load when
-// an analysis actually starts, not when the route module is first imported).
-async function runAnalysisGraph(input: any): Promise<void> {
-  const { runAnalysisGraph: fn } = await import("@/lib/graph/workflow");
-  return fn(input);
-}
+// CRITICAL: Do NOT import the workflow, db, or auth at module level.
+// This route is hit by the user's browser. If we import the heavy LangGraph
+// workflow at module level, Turbopack tries to compile ALL agents + services
+// the moment this route is first accessed — which OOMs the 4GB dev sandbox.
+//
+// Instead, we lazy-load EVERYTHING (db, auth, workflow) inside the handler
+// using dynamic import(). This way the route module itself is tiny and compiles
+// instantly. The heavy modules only load when an actual request comes in,
+// and by that point the HTTP response can return before the graph kicks off.
 
 // FIX 1: expanded form schema with all 6 fields
 const schema = z.object({
-  // 1. Product link (optional Amazon.in or Flipkart.com URL)
   productLink: z.string().url().optional().or(z.literal("").transform(() => undefined)),
-
-  // 2. Product name / short description (required if no link)
   productName: z.string().min(3).optional(),
-
-  // 3. Category (required)
   category: z.enum([
-    "Electronics",
-    "Fashion",
-    "Home & Kitchen",
-    "Beauty",
-    "Sports",
-    "Books",
-    "Toys",
-    "Grocery",
-    "Other",
+    "Electronics", "Fashion", "Home & Kitchen", "Beauty", "Sports",
+    "Books", "Toys", "Grocery", "Other",
   ]),
-
-  // 4. Price range (required, in INR)
   priceMin: z.number().min(0),
   priceMax: z.number().min(1),
-
-  // 5. Platform preference (required, default both)
   platform: z.enum(["amazon", "flipkart", "both"]).default("both"),
-
-  // 6. Competitors (optional list of links)
   competitors: z.array(z.string()).max(3).default([]),
-
-  // Auto-find toggle (if true, ignore competitors[] and use fields 2-5 to search)
   autoFind: z.boolean().default(false),
 }).refine(
   (data) => data.priceMax > data.priceMin,
@@ -56,8 +35,15 @@ const schema = z.object({
   { message: "Either provide competitor links or enable auto-find", path: ["competitors"] },
 );
 
+// Prevent Next.js from trying to statically optimize this route.
+export const dynamic = "force-dynamic";
+// Don't cache the response.
+export const revalidate = 0;
+
 export async function POST(req: NextRequest) {
   try {
+    // Lazy-load auth (lightweight — just db + bcrypt + jose)
+    const { getUserFromRequest } = await import("@/lib/auth");
     const user = await getUserFromRequest(req);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -71,18 +57,15 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      productLink,
-      productName,
-      category,
-      priceMin,
-      priceMax,
-      platform,
-      competitors,
-      autoFind,
+      productLink, productName, category, priceMin, priceMax,
+      platform, competitors, autoFind,
     } = parsed.data;
 
-    // If link is given, derive yourProductInput from it (skip search for YOUR product)
     const yourProductInput = productLink ?? productName!;
+
+    // Lazy-load db (Prisma client)
+    const { db } = await import("@/lib/db");
+    const { isDemoMode } = await import("@/lib/config");
 
     // Create the AnalysisRun row immediately so we can return run_id
     const run = await db.analysisRun.create({
@@ -103,7 +86,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Kick off the graph async (fire-and-forget)
     const agentInput = {
       runId: run.id,
       userId: user.id,
@@ -126,10 +108,20 @@ export async function POST(req: NextRequest) {
       startedAt: Date.now(),
     };
 
-    // Run in background — don't await
-    runAnalysisGraph(agentInput).catch((e) => {
-      console.error(`[analysis/start] Background graph failed:`, e);
-    });
+    // Defer the heavy graph import + execution to the next event-loop tick.
+    // This ensures the HTTP response is sent FIRST (the user sees the runId
+    // immediately), and the LangGraph workflow compiles + runs in the
+    // background without blocking the response.
+    //
+    // We use setTimeout(0) instead of setImmediate because Next.js
+    // bundles setImmediate differently in dev mode.
+    setTimeout(() => {
+      import("@/lib/graph/workflow")
+        .then(({ runAnalysisGraph }) => runAnalysisGraph(agentInput))
+        .catch((e) => {
+          console.error(`[analysis/start] Background graph failed:`, e);
+        });
+    }, 0);
 
     return NextResponse.json({
       runId: run.id,
