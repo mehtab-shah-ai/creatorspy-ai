@@ -56,11 +56,37 @@ export function AuthView() {
     }
   }
 
-  function fillDemo() {
-    setEmail("demo@clarify.ai");
-    setPassword("demo1234");
+  // One-click demo: try login first, if account doesn't exist → register.
+  // This way the user never sees "email already registered" errors and
+  // never has to switch tabs manually.
+  async function demoLogin() {
+    setLoading(true);
+    const demoEmail = "demo@clarify.ai";
+    const demoPass = "demo1234";
+    setEmail(demoEmail);
+    setPassword(demoPass);
     setName("Alex Rivera");
-    setMode("register");
+    try {
+      // Try login first (account may already exist from a previous session)
+      try {
+        const result = await api.login(demoEmail, demoPass);
+        setAuth(result.user, result.token);
+        toast({ title: "Welcome back", description: result.user.email });
+        goDashboard();
+        return;
+      } catch {
+        // Login failed — account probably doesn't exist yet. Fall through to register.
+      }
+      // Register the demo account
+      const result = await api.register(demoEmail, demoPass, "Alex Rivera");
+      setAuth(result.user, result.token);
+      toast({ title: "Welcome to ClarifyAI", description: result.user.email });
+      goDashboard();
+    } catch (e: any) {
+      toast({ title: "Couldn't sign you in", description: e?.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -266,10 +292,11 @@ export function AuthView() {
 
                         <button
                           type="button"
-                          onClick={fillDemo}
-                          className="w-full text-xs text-muted-foreground hover:text-accent transition-colors pt-1"
+                          onClick={demoLogin}
+                          disabled={loading}
+                          className="w-full text-xs text-muted-foreground hover:text-accent transition-colors pt-1 disabled:opacity-50"
                         >
-                          Use demo credentials →
+                          {loading ? "Signing you in…" : "Try the demo — one click →"}
                         </button>
                       </form>
                     </TabsContent>
