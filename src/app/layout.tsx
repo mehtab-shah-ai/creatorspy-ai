@@ -24,10 +24,13 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Competitor Intel — Aspect-by-Aspect Review Intelligence",
+  title: "ClarifyAI — Know what your customers really think",
   description:
-    "Submit your product + competitors. An autonomous LangGraph agent pipeline scrapes marketplace reviews, cross-verifies against Reddit/blogs, and returns a parallel aspect-by-aspect comparison with live cost telemetry.",
-  keywords: ["competitive intelligence", "review analysis", "LangGraph", "agentic", "e-commerce"],
+    "Paste a product link. Get a side-by-side truth report — what people love, what they wish was better, and where you can win. Backed by real reviews, cross-checked against the open web.",
+  keywords: ["competitive intelligence", "review analysis", "product comparison", "ClarifyAI"],
+  icons: {
+    icon: "/logo.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

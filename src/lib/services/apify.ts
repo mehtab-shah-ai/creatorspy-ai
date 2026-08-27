@@ -120,6 +120,11 @@ function mockScrape(input: string, maxReviews: number): ApifyScrapeResult {
   const seed = hashString(input);
   const rng = mulberry32(seed);
 
+  // Detect platform + currency from URL
+  const isFlipkart = /flipkart\./i.test(input);
+  const isAmazon = /amazon\./i.test(input);
+  const currency = isFlipkart ? "INR" : "USD";
+
   const aspects = [
     { aspect: "battery life", sentiment: "positive" as const, templates: [
       "Battery easily lasts me 2+ days with normal use — very impressed.",
@@ -169,13 +174,20 @@ function mockScrape(input: string, maxReviews: number): ApifyScrapeResult {
     };
   });
 
+  // Realistic price range based on currency
+  // INR: 999 - 49,999 (typical Indian e-commerce pricing)
+  // USD: 19 - 499
+  const price = currency === "INR"
+    ? Math.floor(999 + rng() * 49000)
+    : Math.floor(19 + rng() * 480);
+
   return {
     reviews,
     productInfo: {
       title: `Demo Product (${asin})`,
       asin,
-      price: Math.floor(20 + rng() * 200),
-      currency: "USD",
+      price,
+      currency,
       rating: Number((3 + rng() * 1.8).toFixed(1)),
       reviewsCount: reviewCount,
       imageUrl: undefined,

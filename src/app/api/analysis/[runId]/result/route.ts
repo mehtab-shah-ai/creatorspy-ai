@@ -50,6 +50,7 @@ export async function GET(
       return {
         productId: p.asin ?? p.id,
         productName: p.name ?? "Unknown",
+        sourceUrl: p.sourceUrl ?? undefined,
         role: p.role as "your_product" | "competitor",
         price: p.price ?? undefined,
         currency: p.currency ?? "USD",

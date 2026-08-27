@@ -51,6 +51,7 @@ export interface AspectCluster {
 export interface ProductAspectSummary {
   productId: string;
   productName: string;
+  sourceUrl?: string;
   role: ProductRole;
   price?: number;
   currency?: string;

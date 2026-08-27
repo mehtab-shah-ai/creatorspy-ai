@@ -1,6 +1,6 @@
-# Competitor Intel — Autonomous E-commerce Review Intelligence Agent
+# ClarifyAI — AI-Powered Competitive Intelligence Platform
 
-> Submit your product + 1–3 competitors. An 11-node LangGraph agent pipeline scrapes marketplace reviews, cross-verifies against Reddit/blog sentiment, clusters by aspect, and returns a parallel aspect-by-aspect comparison — with live cost telemetry.
+> Paste a product link and we'll read every review, cross-check it against Reddit and blogs, and tell you exactly what people love, what they wish was better, and where you can win — side by side with your competitors.
 
 ---
 
