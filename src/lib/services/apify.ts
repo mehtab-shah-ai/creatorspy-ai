@@ -38,12 +38,26 @@ export interface ApifyScrapeResult {
   errorMessage?: string;
 }
 
+export interface ApifyScrapeOptions {
+  // Hint from upstream — when in demo mode, use these instead of generating
+  // a random price (keeps the price the user saw in search results).
+  expectedPrice?: number;
+  expectedCurrency?: string;
+  url?: string;
+  name?: string;
+  // Fallback price range (from user's form input) — used for your_product
+  // when there's no Serper result (i.e. user typed a name, no link).
+  priceMin?: number;
+  priceMax?: number;
+}
+
 export async function scrapeAmazonReviews(
   asinOrUrl: string,
   maxReviews = config.maxReviewsPerProduct,
+  opts: ApifyScrapeOptions = {},
 ): Promise<ApifyScrapeResult> {
   if (!isServiceAvailable("APIFY")) {
-    return mockScrape(asinOrUrl, maxReviews);
+    return mockScrape(asinOrUrl, maxReviews, opts);
   }
 
   const asinMatch = asinOrUrl.match(/([A-Z0-9]{10})/i);
@@ -113,17 +127,20 @@ export async function scrapeAmazonReviews(
 
 // ---------- Demo-mode mock ----------
 
-function mockScrape(input: string, maxReviews: number): ApifyScrapeResult {
+function mockScrape(input: string, maxReviews: number, opts: ApifyScrapeOptions = {}): ApifyScrapeResult {
   const asinMatch = input.match(/([A-Z0-9]{10})/i);
   const asin = asinMatch ? asinMatch[1]!.toUpperCase() : `MOCK${input.slice(0, 5).toUpperCase()}`;
 
   const seed = hashString(input);
   const rng = mulberry32(seed);
 
-  // Detect platform + currency from URL
-  const isFlipkart = /flipkart\./i.test(input);
-  const isAmazon = /amazon\./i.test(input);
-  const currency = isFlipkart ? "INR" : "USD";
+  // Detect platform + currency from URL (or opts.url)
+  const urlToCheck = opts.url ?? input;
+  const isFlipkart = /flipkart\./i.test(urlToCheck);
+  const isAmazon = /amazon\./i.test(urlToCheck);
+  const currency = opts.expectedCurrency ?? (isFlipkart ? "INR" : isAmazon ? "INR" : "INR");
+  // Default to INR — this app targets Indian e-commerce (amazon.in / flipkart.com).
+  // If a generic product name is given (no URL), assume INR since the form asks for ₹.
 
   const aspects = [
     { aspect: "battery life", sentiment: "positive" as const, templates: [
@@ -174,17 +191,28 @@ function mockScrape(input: string, maxReviews: number): ApifyScrapeResult {
     };
   });
 
-  // Realistic price range based on currency
-  // INR: 999 - 49,999 (typical Indian e-commerce pricing)
-  // USD: 19 - 499
-  const price = currency === "INR"
-    ? Math.floor(999 + rng() * 49000)
-    : Math.floor(19 + rng() * 480);
+  // Use expectedPrice from upstream (Serper mock) when available — keeps the
+  // price consistent with what the user saw in search results.
+  // Otherwise, if user gave a price range, pick a random price in that range.
+  // Otherwise generate a realistic price for the currency.
+  let price: number;
+  if (opts.expectedPrice != null) {
+    price = opts.expectedPrice;
+  } else if (opts.priceMin != null && opts.priceMax != null && opts.priceMax > opts.priceMin) {
+    price = Math.round(opts.priceMin + rng() * (opts.priceMax - opts.priceMin));
+  } else if (currency === "INR") {
+    price = Math.floor(999 + rng() * 49000);
+  } else {
+    price = Math.floor(19 + rng() * 480);
+  }
+
+  // Use the candidate's actual name (from Serper result title) if available
+  const title = opts.name ?? `Demo Product (${asin})`;
 
   return {
     reviews,
     productInfo: {
-      title: `Demo Product (${asin})`,
+      title,
       asin,
       price,
       currency,

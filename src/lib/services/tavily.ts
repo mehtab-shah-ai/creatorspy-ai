@@ -1,8 +1,12 @@
 import { isServiceAvailable } from "../config";
 import { withRetry, withTimeout } from "../retry";
+import type { SerperProduct } from "./serper";
 
 /**
- * Tavily — fallback search API when Serper fails or is rate-limited.
+ * Tavily — fallback search API when Serper returns 0 qualifying results.
+ *
+ * FIX 2C: Uses the SAME site: restriction logic as Serper so results stay
+ *         filtered to product pages on the target platform.
  */
 
 const TAVILY_URL = "https://api.tavily.com/search";
@@ -14,14 +18,71 @@ export interface TavilyResult {
   score: number;
 }
 
-export async function tavilySearch(
-  query: string,
-  opts: { maxResults?: number; searchDepth?: "basic" | "advanced" } = {},
-): Promise<{ results: TavilyResult[]; demoMode: boolean; cost: number }> {
+export interface TavilyCompetitorOptions {
+  productName: string;
+  category?: string;
+  priceMin?: number;
+  priceMax?: number;
+  platform?: "amazon" | "flipkart" | "both";
+  count?: number;
+}
+
+/**
+ * Search for competitor product URLs restricted to amazon.in / flipkart.com.
+ * Returns SerperProduct-shaped objects so the caller can use the same
+ * verification pipeline downstream.
+ */
+export async function tavilyFindCompetitors(
+  opts: TavilyCompetitorOptions,
+): Promise<{ products: SerperProduct[]; demoMode: boolean; cost: number; queries: string[] }> {
   if (!isServiceAvailable("TAVILY")) {
-    return mockSearch(query);
+    return mockFind(opts);
   }
 
+  const count = opts.count ?? 5;
+  const platforms: ("amazon" | "flipkart")[] =
+    opts.platform === "amazon" ? ["amazon"] :
+    opts.platform === "flipkart" ? ["flipkart"] :
+    ["amazon", "flipkart"];
+
+  const queries: string[] = platforms.map((p) => {
+    const site = p === "amazon" ? "amazon.in" : "flipkart.com";
+    let q = `site:${site} "${opts.productName}"`;
+    if (opts.category) q += ` ${opts.category}`;
+    if (opts.priceMax) q += ` under ₹${opts.priceMax}`;
+    return q;
+  });
+
+  console.log(`[tavily] Fallback queries with site: restriction:`, queries);
+
+  const tasks = queries.map((q) => callTavily(q, count));
+  const results = await Promise.allSettled(tasks);
+
+  let totalCost = 0;
+  const all: SerperProduct[] = [];
+
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      all.push(...r.value.products);
+      totalCost += r.value.cost;
+    }
+  }
+
+  // De-dup by URL
+  const seen = new Set<string>();
+  const unique = all.filter((p) => {
+    if (seen.has(p.link)) return false;
+    seen.add(p.link);
+    return true;
+  }).slice(0, count);
+
+  return { products: unique, demoMode: false, cost: totalCost, queries };
+}
+
+async function callTavily(
+  query: string,
+  count: number,
+): Promise<{ products: SerperProduct[]; cost: number }> {
   const res = await withRetry(
     () =>
       withTimeout(
@@ -31,9 +92,11 @@ export async function tavilySearch(
           body: JSON.stringify({
             api_key: process.env.TAVILY_API_KEY,
             query,
-            search_depth: opts.searchDepth ?? "basic",
-            max_results: opts.maxResults ?? 5,
+            search_depth: "basic",
+            max_results: count + 3,
             include_answer: false,
+            // Tavily supports domain include/exclude lists — but site: operator in query
+            // already restricts results to the right domain.
           }),
         }).then(async (r) => {
           if (!r.ok) {
@@ -49,42 +112,70 @@ export async function tavilySearch(
     { label: "tavily" },
   );
 
-  if (!res.ok) return { results: [], demoMode: false, cost: 0 };
+  if (!res.ok) return { products: [], cost: 0 };
 
   const data = res.value as any;
   const results: TavilyResult[] = (data.results ?? []).map((r: any) => ({
-    title: r.title,
-    url: r.url,
-    content: r.content,
+    title: r.title ?? "",
+    url: r.url ?? "",
+    content: r.content ?? "",
     score: r.score ?? 0,
   }));
 
-  return { results, demoMode: false, cost: 0.005 };
+  // Convert Tavily results to SerperProduct shape (no price from Tavily — Scraper
+  // step or competitor verification will fetch the actual listing price).
+  const products: SerperProduct[] = results.map((r) => ({
+    title: r.title,
+    link: r.url,
+    source: r.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] ?? "unknown",
+    price: parsePriceFromContent(r.content),
+    currency: "INR",
+  }));
+
+  return { products, cost: 0.005 }; // ~$0.005 per basic search
 }
 
-function mockSearch(query: string) {
-  return {
-    results: [
-      {
-        title: `Reddit thread: thoughts on ${query}?`,
-        url: `https://www.reddit.com/r/BuyItForLife/comments/mock_${hash(query)}`,
-        content: `Honestly, after 6 months of using ${query}, the build quality is great but battery life disappointed me. Compared to alternatives, it's mid-tier at best.`,
-        score: 0.92,
-      },
-      {
-        title: `Blog: hands-on review of ${query}`,
-        url: `https://example-blog.com/${hash(query)}`,
-        content: `After two weeks of testing, ${query} offers solid value. Connectivity could be better but the audio quality is genuinely impressive at this price point.`,
-        score: 0.88,
-      },
-    ],
-    demoMode: true,
-    cost: 0,
-  };
+function parsePriceFromContent(content: string): number | undefined {
+  // Look for ₹X,XXX or Rs. X,XXX patterns
+  const match = content.match(/(?:₹|Rs\.?\s*)([\d,]+)/i);
+  if (!match) return undefined;
+  const n = parseFloat(match[1]!.replace(/,/g, ""));
+  return isNaN(n) ? undefined : n;
 }
 
-function hash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  return Math.abs(h) % 10000;
+// ---------- Demo-mode mock ----------
+
+function mockFind(opts: TavilyCompetitorOptions) {
+  const platforms: ("amazon" | "flipkart")[] =
+    opts.platform === "amazon" ? ["amazon"] :
+    opts.platform === "flipkart" ? ["flipkart"] :
+    ["amazon", "flipkart"];
+
+  const queries: string[] = platforms.map((p) => {
+    const site = p === "amazon" ? "amazon.in" : "flipkart.com";
+    let q = `site:${site} "${opts.productName}"`;
+    if (opts.category) q += ` ${opts.category}`;
+    if (opts.priceMax) q += ` under ₹${opts.priceMax}`;
+    return q;
+  });
+
+  console.log(`[tavily] DEMO MODE — would have sent fallback queries:`, queries);
+
+  const competitors = ["boAt", "Noise", "pTron", "Realme", "Sony", "Bose", "JBL", "Sennheiser"];
+  const picked = competitors.slice(0, opts.count ?? 3);
+  const products: SerperProduct[] = picked.flatMap((brand, i) => {
+    const p = platforms[i % platforms.length]!;
+    const domain = p === "amazon" ? "amazon.in" : "flipkart.com";
+    const priceRange = (opts.priceMax ?? 1000) - (opts.priceMin ?? 0);
+    const price = Math.round((opts.priceMin ?? 100) + Math.random() * priceRange);
+    return [{
+      title: `${brand} ${opts.productName}`,
+      link: `https://www.${domain}/dp/TAVILY${brand.toUpperCase().slice(0, 4)}${i}`,
+      source: domain,
+      price,
+      currency: "INR",
+    }];
+  });
+
+  return { products, demoMode: true, cost: 0, queries };
 }

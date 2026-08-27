@@ -131,12 +131,22 @@ export interface AnalysisResultDTO {
 
 // ---------- LangGraph state ----------
 
+export type PlatformPref = "amazon" | "flipkart" | "both";
+
 export interface AgentState {
   runId: string;
   userId: string;
   yourProductInput: string;
   competitorInputs: string[];
   autoFind: boolean;
+
+  // FIX 1: structured form fields — power auto-find with relevant results
+  productLink?: string;        // optional Amazon.in / Flipkart.com URL
+  productName?: string;        // required if no link given
+  category?: string;           // Electronics | Fashion | Home & Kitchen | ...
+  priceMin?: number;           // user's min price (INR)
+  priceMax?: number;           // user's max price (INR)
+  platformPref?: PlatformPref; // amazon | flipkart | both
 
   // Resolved products (post-scraper)
   products: ProductSnapshot[];

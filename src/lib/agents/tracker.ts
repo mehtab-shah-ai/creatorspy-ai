@@ -53,14 +53,15 @@ export async function trackNode<T>(
 
 // Sum of weights = 1.0
 const PROGRESS_BY_NODE: Record<string, number> = {
-  inputValidator: 0.05,
-  competitorResolver: 0.1,
-  scraper: 0.35,
-  clustering: 0.5,
-  aspectLabeling: 0.65,
-  aggregation: 0.75,
-  crossSourceVerification: 0.82,
-  insightSynthesis: 0.92,
+  inputValidator: 0.04,
+  competitorResolver: 0.08,
+  competitorVerifier: 0.15,
+  scraper: 0.40,
+  clustering: 0.55,
+  aspectLabeling: 0.68,
+  aggregation: 0.78,
+  crossSourceVerification: 0.85,
+  insightSynthesis: 0.93,
   selfVerification: 0.98,
   costLogger: 1.0,
 };
@@ -68,6 +69,7 @@ const PROGRESS_BY_NODE: Record<string, number> = {
 export const NODE_ORDER = [
   "inputValidator",
   "competitorResolver",
+  "competitorVerifier",
   "scraper",
   "clustering",
   "aspectLabeling",

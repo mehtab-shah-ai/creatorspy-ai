@@ -2,6 +2,7 @@ import { StateGraph, START, END } from "@langchain/langgraph";
 import { StateGraphAnnotation, fromAgentState, type GraphState } from "./state";
 import { inputValidatorNode } from "../agents/input-validator";
 import { competitorResolverNode } from "../agents/competitor-resolver";
+import { competitorVerifierNode } from "../agents/competitor-verifier";
 import { scraperNode } from "../agents/scraper";
 import { clusteringAndLabelingNode } from "../agents/clustering-labeling";
 import { aggregationNode } from "../agents/aggregation";
@@ -16,20 +17,20 @@ import type { AgentState } from "../types";
  * LangGraph state machine — the explicit graph that orchestrates the
  * multi-agent pipeline.
  *
- *   START → inputValidator → competitorResolver → scraper →
- *     clusteringAndLabeling → aggregation → crossSourceVerification →
+ *   START → inputValidator → competitorResolver → competitorVerifier →
+ *     scraper → clustering → aggregation → crossSourceVerification →
  *     insightSynthesis → selfVerification → costLogger → END
  *
- * The graph is straight-line (no conditional edges) because the user spec
- * lists a fixed sequential flow. Internal node bodies still do parallel
- * fan-out where appropriate (e.g. scraper fans out per product).
+ * FIX 3: competitorVerifier is a NEW node between resolver and scraper.
+ *        If it sets verificationMessage (no comparable competitor found),
+ *        the graph short-circuits to costLogger to avoid wasting Apify credits.
  */
 const workflow = new StateGraph(StateGraphAnnotation)
   .addNode("inputValidator", inputValidatorNode)
   .addNode("competitorResolver", competitorResolverNode)
+  .addNode("competitorVerifier", competitorVerifierNode)
   .addNode("scraper", scraperNode)
   .addNode("clustering", async (state: GraphState) => {
-    // clusteringAndLabeling logs both "clustering" and "aspectLabeling" nodes internally
     return clusteringAndLabelingNode(state);
   })
   .addNode("aggregation", aggregationNode)
@@ -39,7 +40,19 @@ const workflow = new StateGraph(StateGraphAnnotation)
   .addNode("costLogger", costLoggerNode)
   .addEdge(START, "inputValidator")
   .addEdge("inputValidator", "competitorResolver")
-  .addEdge("competitorResolver", "scraper")
+  .addEdge("competitorResolver", "competitorVerifier")
+  // Conditional: if verifier found comparable competitors → scraper, else → costLogger
+  .addConditionalEdges(
+    "competitorVerifier",
+    (state: GraphState) => {
+      if (state.verificationMessage) {
+        console.log(`[graph] Short-circuiting to costLogger — no comparable competitor found: ${state.verificationMessage}`);
+        return "costLogger";
+      }
+      return "scraper";
+    },
+    { scraper: "scraper", costLogger: "costLogger" },
+  )
   .addEdge("scraper", "clustering")
   .addEdge("clustering", "aggregation")
   .addEdge("aggregation", "crossSourceVerification")
@@ -65,22 +78,36 @@ export async function runAnalysisGraph(input: AgentState): Promise<void> {
   });
 
   try {
-    // Stream the graph so we can observe progress
-    // (We use invoke for simplicity here; in production we'd use streamEvents
-    //  to push live updates via SSE.)
     const finalState = await app.invoke(initialState, {
       recursionLimit: 50,
-    });
+    }) as GraphState;
 
-    // The costLogger node already persisted everything to DB + marked run as completed.
-    // If somehow it didn't (e.g. error before costLogger), mark as completed with what we have.
+    // If verification failed, surface the message on the run row.
+    if (finalState.verificationMessage) {
+      await db.analysisRun.update({
+        where: { id: runId },
+        data: {
+          status: "completed",
+          errorMessage: finalState.verificationMessage,
+          totalCost: finalState.nodeLogs?.reduce((s, n) => s + (n.cost ?? 0), 0) ?? 0,
+          totalLatencyMs: Date.now() - initialState.startedAt,
+          completedAt: new Date(),
+          progress: 1.0,
+          current_node: "costLogger",
+        },
+      });
+      return;
+    }
+
+    // The costLogger node already persisted everything + marked run as completed.
+    // If somehow it didn't (e.g. error before costLogger), mark as completed here.
     const run = await db.analysisRun.findUnique({ where: { id: runId } });
     if (run && run.status === "running") {
       await db.analysisRun.update({
         where: { id: runId },
         data: {
           status: "completed",
-          totalCost: (finalState as GraphState).nodeLogs?.reduce((s, n) => s + (n.cost ?? 0), 0) ?? 0,
+          totalCost: finalState.nodeLogs?.reduce((s, n) => s + (n.cost ?? 0), 0) ?? 0,
           totalLatencyMs: Date.now() - initialState.startedAt,
           completedAt: new Date(),
           progress: 1.0,

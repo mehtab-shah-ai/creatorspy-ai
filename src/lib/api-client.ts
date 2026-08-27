@@ -48,7 +48,16 @@ export const api = {
   },
 
   async startAnalysis(
-    body: { yourProduct: string; competitors: string[]; autoFind: boolean },
+    body: {
+      productLink?: string;
+      productName?: string;
+      category: string;
+      priceMin: number;
+      priceMax: number;
+      platform: "amazon" | "flipkart" | "both";
+      competitors: string[];
+      autoFind: boolean;
+    },
     token: string,
   ) {
     const r = await fetch(`${API_BASE}/analysis/start`, {

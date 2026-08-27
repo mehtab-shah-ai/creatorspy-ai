@@ -6,6 +6,7 @@ import type {
   NodeLogDTO,
   ProductSnapshot,
   AgentState,
+  PlatformPref,
 } from "../types";
 
 /**
@@ -19,12 +20,52 @@ export const StateGraphAnnotation = Annotation.Root({
   competitorInputs: Annotation<string[]>,
   autoFind: Annotation<boolean>,
 
+  // FIX 1: structured form fields
+  productLink: Annotation<string | undefined>({
+    reducer: (_, v) => v,
+    default: () => undefined,
+  }),
+  productName: Annotation<string | undefined>({
+    reducer: (_, v) => v,
+    default: () => undefined,
+  }),
+  category: Annotation<string | undefined>({
+    reducer: (_, v) => v,
+    default: () => undefined,
+  }),
+  priceMin: Annotation<number | undefined>({
+    reducer: (_, v) => v,
+    default: () => undefined,
+  }),
+  priceMax: Annotation<number | undefined>({
+    reducer: (_, v) => v,
+    default: () => undefined,
+  }),
+  platformPref: Annotation<PlatformPref | undefined>({
+    reducer: (_, v) => v,
+    default: () => undefined,
+  }),
+
   // Validator output
   validatedProducts: Annotation<
-    { input: string; role: "your_product" | "competitor"; asin?: string; url?: string; name?: string; platform: string }[]
+    { input: string; role: "your_product" | "competitor"; asin?: string; url?: string; name?: string; platform: string; expectedPrice?: number; expectedCurrency?: string }[]
   >({
     reducer: (_, v) => v,
     default: () => [],
+  }),
+
+  // FIX 3: candidates awaiting verification (output of competitorResolver, input to competitorVerifier)
+  candidateCompetitors: Annotation<
+    { title: string; link: string; source: string; price?: number; currency?: string; imageUrl?: string; rating?: number; ratingCount?: number }[]
+  >({
+    reducer: (_, v) => v,
+    default: () => [],
+  }),
+
+  // FIX 3: when verification fails to find ANY comparable competitor, set this to surface to the user
+  verificationMessage: Annotation<string | undefined>({
+    reducer: (_, v) => v,
+    default: () => undefined,
   }),
 
   products: Annotation<ProductSnapshot[]>({
@@ -90,7 +131,15 @@ export function fromAgentState(s: AgentState): GraphState {
     yourProductInput: s.yourProductInput,
     competitorInputs: s.competitorInputs,
     autoFind: s.autoFind,
+    productLink: s.productLink,
+    productName: s.productName,
+    category: s.category,
+    priceMin: s.priceMin,
+    priceMax: s.priceMax,
+    platformPref: s.platformPref,
     validatedProducts: [],
+    candidateCompetitors: [],
+    verificationMessage: undefined,
     products: [],
     cacheHits: 0,
     cacheMisses: 0,

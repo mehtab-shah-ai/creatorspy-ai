@@ -34,6 +34,15 @@ model AnalysisRun {
   yourProductInput String       // raw user input (link or name)
   competitorInputs String       // JSON array of competitor inputs (links or "auto")
   autoFind      Boolean         @default(false)
+
+  // FIX 1: structured form fields — power auto-find with relevant results
+  productLink   String?          // optional Amazon.in / Flipkart.com URL
+  productName   String?          // required if no link given
+  category      String?          // Electronics | Fashion | Home & Kitchen | Beauty | Sports | Books | Toys | Other
+  priceMin      Float?           // user's min price (in INR)
+  priceMax      Float?           // user's max price (in INR)
+  platformPref  String           @default("both") // amazon | flipkart | both
+
   totalCost     Float            @default(0) // USD
   totalLatencyMs Int             @default(0)
   errorMessage  String?

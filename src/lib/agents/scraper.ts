@@ -23,7 +23,17 @@ export async function scraperNode(state: GraphState): Promise<Partial<GraphState
     const products = s.validatedProducts;
 
     // Parallel fan-out — one async task per product
-    const tasks = products.map((p) => scrapeOneProduct(p.input, p.role, p.platform, p.name, p.asin, p.url));
+    // Pass through expectedPrice/expectedCurrency so demo-mode mock uses the
+    // candidate's actual price (from Serper) instead of regenerating one.
+    // Also pass priceMin/priceMax so your_product (which has no Serper result)
+    // gets a price within the user's specified range.
+    const tasks = products.map((p) =>
+      scrapeOneProduct(
+        p.input, p.role, p.platform, p.name, p.asin, p.url,
+        p.expectedPrice, p.expectedCurrency,
+        s.priceMin, s.priceMax,
+      ),
+    );
     const results = await Promise.allSettled(tasks);
 
     let totalCost = 0;
@@ -89,6 +99,10 @@ async function scrapeOneProduct(
   name?: string,
   asin?: string,
   url?: string,
+  expectedPrice?: number,
+  expectedCurrency?: string,
+  priceMin?: number,
+  priceMax?: number,
 ): Promise<ScrapeResult> {
   // Cache check (48h TTL)
   const cacheKey = asin ?? cacheKeyFromInput(input);
@@ -101,7 +115,10 @@ async function scrapeOneProduct(
 
   // Fan out: Apify + Firecrawl #1 + Firecrawl #2 in parallel
   const [apifyRes, firecrawlReddit, firecrawlBlog] = await Promise.allSettled([
-    scrapeAmazonReviews(asin ?? input, config.maxReviewsPerProduct),
+    scrapeAmazonReviews(asin ?? input, config.maxReviewsPerProduct, {
+      expectedPrice, expectedCurrency, url, name,
+      priceMin, priceMax,
+    }),
     firecrawlSearch(`${name ?? input} review reddit`, 1, { source: "reddit", limit: 3 }),
     firecrawlSearch(`${name ?? input} review blog`, 2, { source: "blog", limit: 2 }),
   ]);

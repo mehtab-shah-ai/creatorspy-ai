@@ -3,11 +3,32 @@ import { trackNode } from "./tracker";
 
 /**
  * Node 1 — Input Validator.
- * Parses user input (link vs name), extracts ASIN/product-ID if link given.
+ *
+ * FIX 1: Validates the structured form fields:
+ *   - productLink (optional): if given, extract ASIN/product-ID, skip search
+ *   - productName (required if no link)
+ *   - category (required)
+ *   - priceMin/priceMax (required)
+ *   - platform (required, default both)
+ *
+ * For competitor inputs (user-provided links), validates each is a valid URL.
  * Catches invalid/non-existent links BEFORE any paid API calls happen.
  */
 export async function inputValidatorNode(state: GraphState): Promise<Partial<GraphState>> {
   return trackNode(state, "inputValidator", async (s) => {
+    // Validate structured form fields
+    if (!s.category) throw new Error("Category is required");
+    if (s.priceMin == null || s.priceMax == null) throw new Error("Price range is required");
+    if (s.priceMax <= s.priceMin) throw new Error("Max price must be greater than min price");
+    if (!s.platformPref) throw new Error("Platform preference is required");
+
+    // Determine your_product: prefer link, fall back to name
+    const yourInput = s.productLink ?? s.productName;
+    if (!yourInput) throw new Error("Either product link or product name is required");
+
+    const yourParsed = parseProductInput(yourInput, "your_product");
+    if (!yourParsed.ok) throw new Error(`Invalid your-product input: ${yourParsed.error}`);
+
     const all: {
       input: string;
       role: "your_product" | "competitor";
@@ -15,21 +36,10 @@ export async function inputValidatorNode(state: GraphState): Promise<Partial<Gra
       url?: string;
       name?: string;
       platform: string;
-    }[] = [];
+    }[] = [yourParsed.value];
 
-    // Validate your product
-    const yourInput = s.yourProductInput.trim();
-    if (!yourInput) throw new Error("Your product input is required");
-
-    const yourParsed = parseProductInput(yourInput, "your_product");
-    if (!yourParsed.ok) throw new Error(`Invalid your-product input: ${yourParsed.error}`);
-    all.push(yourParsed.value);
-
-    // Validate competitors
-    if (s.autoFind) {
-      // Competitors will be resolved by competitorResolver node
-      // No validation needed here
-    } else {
+    // Validate competitor inputs (only if not auto-find)
+    if (!s.autoFind) {
       if (s.competitorInputs.length === 0) {
         throw new Error("Either provide competitor links or enable auto-find");
       }
@@ -43,7 +53,13 @@ export async function inputValidatorNode(state: GraphState): Promise<Partial<Gra
     return {
       result: { validatedProducts: all },
       cost: 0,
-      metadata: { validated: all.length },
+      metadata: {
+        validated: all.length,
+        hasLink: !!s.productLink,
+        category: s.category,
+        priceRange: [s.priceMin, s.priceMax],
+        platform: s.platformPref,
+      },
     };
   });
 }
@@ -63,9 +79,9 @@ function parseProductInput(
 
   // URL?
   if (/^https?:\/\//i.test(trimmed)) {
-    // Amazon URL
+    // Amazon URL (any TLD — amazon.in, amazon.com, etc.)
     const asinMatch = trimmed.match(/\/(?:dp|gp\/product|exec\/obidos\/asin)\/([A-Z0-9]{10})/i);
-    if (asinMatch) {
+    if (asinMatch && /amazon\./i.test(trimmed)) {
       return {
         ok: true,
         value: {

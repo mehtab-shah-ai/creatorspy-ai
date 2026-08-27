@@ -8,8 +8,16 @@ import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   X,
@@ -21,12 +29,37 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const CATEGORIES = [
+  "Electronics",
+  "Fashion",
+  "Home & Kitchen",
+  "Beauty",
+  "Sports",
+  "Books",
+  "Toys",
+  "Grocery",
+  "Other",
+] as const;
+
+type Platform = "amazon" | "flipkart" | "both";
+
 export function NewAnalysisView() {
   const { token } = useAuth();
   const { goDashboard, openResults } = useUI();
   const { toast } = useToast();
 
-  const [yourProduct, setYourProduct] = useState("");
+  // 1. Product link (optional)
+  const [productLink, setProductLink] = useState("");
+  // 2. Product name (required if no link)
+  const [productName, setProductName] = useState("");
+  // 3. Category (required)
+  const [category, setCategory] = useState<string>("Electronics");
+  // 4. Price range (required, in INR)
+  const [priceMin, setPriceMin] = useState<string>("");
+  const [priceMax, setPriceMax] = useState<string>("");
+  // 5. Platform (required, default both)
+  const [platform, setPlatform] = useState<Platform>("both");
+  // 6. Competitors
   const [competitors, setCompetitors] = useState<string[]>(["", ""]);
   const [autoFind, setAutoFind] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -44,10 +77,22 @@ export function NewAnalysisView() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (yourProduct.trim().length < 3) {
-      toast({ title: "Add your product", description: "Paste an Amazon or Flipkart link, or just type the name.", variant: "destructive" });
+
+    // Validation: either link or name required
+    if (!productLink.trim() && !productName.trim()) {
+      toast({ title: "Add your product", description: "Paste a link or type a product name.", variant: "destructive" });
       return;
     }
+
+    // Validation: price range required
+    const pMin = parseFloat(priceMin);
+    const pMax = parseFloat(priceMax);
+    if (isNaN(pMin) || isNaN(pMax) || pMax <= pMin) {
+      toast({ title: "Fix the price range", description: "Enter a min and max price (max must be greater than min).", variant: "destructive" });
+      return;
+    }
+
+    // Validation: competitors required unless auto-find
     if (!autoFind) {
       const filled = competitors.filter((c) => c.trim().length > 0);
       if (filled.length === 0) {
@@ -61,7 +106,12 @@ export function NewAnalysisView() {
       const filled = competitors.filter((c) => c.trim().length > 0);
       const result = await api.startAnalysis(
         {
-          yourProduct: yourProduct.trim(),
+          productLink: productLink.trim() || undefined,
+          productName: productName.trim() || undefined,
+          category,
+          priceMin: pMin,
+          priceMax: pMax,
+          platform,
           competitors: filled,
           autoFind,
         },
@@ -111,24 +161,123 @@ export function NewAnalysisView() {
           <Card>
             <CardContent className="p-6 md:p-7">
               <form onSubmit={onSubmit} className="space-y-5">
-                {/* Your product */}
+                {/* Field 1: Product link (optional) */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2 text-sm font-medium">
                     <span className="w-2 h-2 rounded-full bg-accent" />
-                    Your product
+                    Product link
+                    <span className="text-xs text-muted-foreground font-normal">(optional — Amazon.in or Flipkart.com URL)</span>
                   </Label>
                   <Input
-                    value={yourProduct}
-                    onChange={(e) => setYourProduct(e.target.value)}
-                    placeholder="Paste Amazon/Flipkart link, or just the product name"
+                    value={productLink}
+                    onChange={(e) => setProductLink(e.target.value)}
+                    placeholder="https://www.amazon.in/dp/B0CHX1W1XY"
                     className="text-base h-11"
+                    type="url"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Links are best — we can grab every review that way. Names work too.
+                    {productLink.trim()
+                      ? "✓ We'll use this link directly — no search needed for your product."
+                      : "No link? Just type the product name below and we'll search for it."}
                   </p>
                 </div>
 
-                {/* Competitors */}
+                {/* Field 2: Product name (required if no link) */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm font-medium">
+                    <span className={`w-2 h-2 rounded-full ${productLink.trim() ? "bg-muted-foreground" : "bg-accent"}`} />
+                    Product name
+                    <span className="text-xs text-muted-foreground font-normal">
+                      {productLink.trim() ? "(optional)" : "(required — since you didn't paste a link)"}
+                    </span>
+                  </Label>
+                  <Input
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder="e.g. Sony WH-1000XM5 wireless headphones"
+                    className="text-base h-11"
+                  />
+                </div>
+
+                {/* Field 3: Category (required) */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm font-medium">
+                    <span className="w-2 h-2 rounded-full bg-accent" />
+                    Category
+                    <span className="text-xs text-muted-foreground font-normal">(required — helps us find similar competitors)</span>
+                  </Label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="h-11 text-base">
+                      <SelectValue placeholder="Pick a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Field 4: Price range (required, in INR) */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm font-medium">
+                    <span className="w-2 h-2 rounded-full bg-accent" />
+                    Price range
+                    <span className="text-xs text-muted-foreground font-normal">(required — in ₹, helps filter out mismatched products)</span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <Input
+                        value={priceMin}
+                        onChange={(e) => setPriceMin(e.target.value.replace(/[^\d]/g, ""))}
+                        placeholder="Min"
+                        type="text"
+                        inputMode="numeric"
+                        className="pl-7 h-11"
+                      />
+                    </div>
+                    <span className="text-muted-foreground text-sm">to</span>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <Input
+                        value={priceMax}
+                        onChange={(e) => setPriceMax(e.target.value.replace(/[^\d]/g, ""))}
+                        placeholder="Max"
+                        type="text"
+                        inputMode="numeric"
+                        className="pl-7 h-11"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Field 5: Platform (required, default both) */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm font-medium">
+                    <span className="w-2 h-2 rounded-full bg-accent" />
+                    Platform
+                    <span className="text-xs text-muted-foreground font-normal">(where should we look?)</span>
+                  </Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["amazon", "flipkart", "both"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPlatform(p)}
+                        className={`h-11 rounded-md border text-sm font-medium transition-all capitalize ${
+                          platform === p
+                            ? "border-accent bg-accent/10 text-accent"
+                            : "border-border bg-transparent text-muted-foreground hover:bg-card/50"
+                        }`}
+                      >
+                        {p === "both" ? "Both" : p === "amazon" ? "Amazon" : "Flipkart"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Field 6: Competitors */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="flex items-center gap-2 text-sm font-medium">
@@ -148,7 +297,7 @@ export function NewAnalysisView() {
                         <div>
                           <p className="text-sm font-medium">We'll find three competitors for you</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            We search the web for similar products and pick the top three based on what's actually selling.
+                            Using your product name, category, and price range — we'll search {platform === "both" ? "Amazon and Flipkart" : platform === "amazon" ? "Amazon" : "Flipkart"} for similar products in your price band, then verify each one is a genuine match before reading any reviews.
                           </p>
                         </div>
                       </CardContent>
@@ -230,8 +379,8 @@ export function NewAnalysisView() {
           />
           <TrustItem
             icon={<Search className="w-4 h-4 text-accent" />}
-            title="Cross-checked"
-            desc="We flag when online chatter disagrees with reviews"
+            title="Verified competitors"
+            desc="We confirm each match is genuinely comparable"
           />
           <TrustItem
             icon={<Zap className="w-4 h-4 text-info" />}

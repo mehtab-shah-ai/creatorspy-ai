@@ -1,79 +1,99 @@
 import type { GraphState } from "../graph/state";
 import { trackNode } from "./tracker";
 import { findCompetitors } from "../services/serper";
-import { tavilySearch } from "../services/tavily";
+import { tavilyFindCompetitors } from "../services/tavily";
 import type { SerperProduct } from "../services/serper";
 
 /**
  * Node 2 — Competitor Resolver.
- * If user gave competitor links, use them.
- * If "auto-find" selected → Serper (Google Shopping) → fallback Tavily if Serper fails.
+ *
+ * FIX 2: Builds site:-restricted queries (site:amazon.in / site:flipkart.com)
+ *        with price hints → calls Serper /shopping endpoint → falls back to
+ *        Tavily with the same site: restriction if Serper returns 0 results.
+ *
+ * Output: candidateCompetitors[] — populated into state for the NEW
+ *         competitorVerifier node (Fix 3) to filter before scraping.
  */
 export async function competitorResolverNode(state: GraphState): Promise<Partial<GraphState>> {
   return trackNode(state, "competitorResolver", async (s) => {
     if (!s.autoFind) {
-      // Competitors already validated by inputValidator
+      // User provided competitor links directly — pass them through as candidates.
+      // The competitorVerifier node (Fix 3) will still verify them.
+      const candidates: SerperProduct[] = s.competitorInputs.map((link) => ({
+        title: "",
+        link,
+        source: detectDomain(link),
+      }));
       return {
-        result: { validatedProducts: s.validatedProducts },
+        result: {
+          candidateCompetitors: candidates,
+          validatedProducts: s.validatedProducts, // unchanged — your_product already validated
+        },
         cost: 0,
-        metadata: { source: "user_provided" },
+        metadata: { source: "user_provided", candidateCount: candidates.length },
       };
     }
 
-    // Auto-find: derive query from your_product input
-    const yourProduct = s.validatedProducts[0];
-    if (!yourProduct) throw new Error("No your-product found in validated products");
-    const query = yourProduct.name ?? yourProduct.asin ?? yourProduct.url ?? "best product";
+    // Auto-find: build structured query from form fields
+    const query = s.productName ?? s.validatedProducts[0]?.name ?? s.validatedProducts[0]?.asin ?? "best product";
+    const platform = s.platformPref ?? "both";
 
     let cost = 0;
     let competitors: SerperProduct[] = [];
     let sourceUsed: "serper" | "tavily" = "serper";
+    let serperQueries: string[] = [];
 
-    // Primary: Serper
-    const ser = await findCompetitors(query, 3);
+    // Primary: Serper /shopping endpoint with site: restriction
+    const ser = await findCompetitors({
+      productName: query,
+      category: s.category,
+      priceMin: s.priceMin,
+      priceMax: s.priceMax,
+      platform,
+      count: 5,
+    });
     cost += ser.cost;
+    serperQueries = ser.queries;
+
     if (ser.products.length > 0) {
       competitors = ser.products;
     } else {
-      // Fallback: Tavily
+      // FIX 2C: fallback to Tavily with same site: restriction
+      console.log(`[competitorResolver] Serper returned 0 results, falling back to Tavily...`);
       sourceUsed = "tavily";
-      const tav = await tavilySearch(`${query} best alternatives buy`);
+      const tav = await tavilyFindCompetitors({
+        productName: query,
+        category: s.category,
+        priceMin: s.priceMin,
+        priceMax: s.priceMax,
+        platform,
+        count: 5,
+      });
       cost += tav.cost;
-      competitors = tav.results.slice(0, 3).map((r) => ({
-        title: r.title,
-        link: r.url,
-        source: "web",
-        price: 0,
-        currency: "USD",
-      }));
+      competitors = tav.products;
+      serperQueries = [...serperQueries, ...tav.queries];
     }
 
-    // Add resolved competitors to validatedProducts list
-    const resolved = [
-      yourProduct,
-      ...competitors.map((c) => ({
-        input: c.link,
-        role: "competitor" as const,
-        url: c.link,
-        name: c.title,
-        platform: detectPlatform(c.link),
-      })),
-    ];
-
     return {
-      result: { validatedProducts: resolved },
+      result: {
+        candidateCompetitors: competitors,
+        validatedProducts: s.validatedProducts,
+      },
       cost,
       metadata: {
         source: sourceUsed,
-        resolvedCount: competitors.length,
+        candidateCount: competitors.length,
         demoMode: ser.demoMode,
+        queries: serperQueries,
       },
     };
   });
 }
 
-function detectPlatform(url: string): string {
-  if (/amazon\./i.test(url)) return "amazon";
-  if (/flipkart\./i.test(url)) return "flipkart";
-  return "unknown";
+function detectDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "unknown";
+  }
 }
