@@ -1,54 +1,51 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+*.egg-info/
+.pytest_cache/
 
-# dependencies
-node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Databases & Cache
+*.db
+!competitor_intel.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+.playwright-mcp/
 
-# testing
-/coverage
-
-# next.js
-/.next/
+# Dependencies & Build
+node_modules/
+.next/
 /out/
+/build/
+/dist/
+.vercel/
 
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-local-*
-.claude
-.z-ai-config
+# Logs & Environment
 *.log
 dev.log
 dev.out.log
-test
-prompt
-
 server.log
-# Skills directory
+npm-debug.log*
+yarn-debug.log*
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# IDE & OS
+.DS_Store
+*.pem
+*.tsbuildinfo
+.claude
+.z-ai-config
 /skills/

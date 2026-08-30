@@ -1,0 +1,33 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="convergeAmber" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="50%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="convergeBorder" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.1"/>
+    </linearGradient>
+    <filter id="amberGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded card -->
+  <rect x="1" y="1" width="38" height="38" rx="10" fill="#181512" stroke="url(#convergeBorder)" stroke-width="1.2"/>
+
+  <!-- Converging connecting rays (Grey to Amber gradient or clean grey lines) -->
+  <line x1="11" y1="12" x2="20" y2="26" stroke="#6B7280" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="20" y1="9" x2="20" y2="26" stroke="#9CA3AF" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="29" y1="12" x2="20" y2="26" stroke="#6B7280" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- Source nodes (Marketplace, Reddit, Blogs) -->
+  <circle cx="11" cy="12" r="2.5" fill="#9CA3AF" stroke="#374151" stroke-width="1"/>
+  <circle cx="20" cy="9" r="2.8" fill="#E5E7EB" stroke="#4B5563" stroke-width="1"/>
+  <circle cx="29" cy="12" r="2.5" fill="#9CA3AF" stroke="#374151" stroke-width="1"/>
+
+  <!-- Central Converged Insight Diamond (Glowing Amber Truth) -->
+  <rect x="20" y="24" width="7.5" height="7.5" rx="1.2" transform="rotate(45 20 24)" fill="url(#convergeAmber)" filter="url(#amberGlow)"/>
+</svg>

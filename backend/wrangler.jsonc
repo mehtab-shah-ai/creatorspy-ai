@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "creatorspy-api",
+  "main": "worker.py",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": ["python_workers"],
+
+  // Cloudflare D1: Permanent Serverless SQLite (Never Wiped)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "creatorspy-db",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ],
+
+  // Cloudflare Vectorize: Permanent Vector DB for Viral Hooks (Never Wiped)
+  "vectorize": [
+    {
+      "binding": "VECTOR_INDEX",
+      "index_name": "creatorspy-hooks"
+    }
+  ],
+
+  // Environment Secrets / Variables
+  "vars": {
+    "ENVIRONMENT": "production"
+  }
+}
