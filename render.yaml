@@ -1,0 +1,38 @@
+services:
+  # 1. FastAPI Backend Service
+  - type: web
+    name: creatorspy-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: WEB_CONCURRENCY
+        value: 4
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_API_KEY_FALLBACK
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # 2. Next.js Frontend Service
+  - type: web
+    name: creatorspy-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_BACKEND_URL
+        fromService:
+          type: web
+          name: creatorspy-backend
+          property: url
