@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "creatorspy-frontend",
+  "account_id": "e2bbfb3b70eb2a07e0af79c810c47daf",
   "compatibility_date": "2024-12-30",
   "compatibility_flags": ["nodejs_compat"],
   "pages_build_output_dir": ".next"

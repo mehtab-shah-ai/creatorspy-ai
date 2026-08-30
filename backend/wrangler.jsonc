@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "creatorspy-api",
+  "account_id": "e2bbfb3b70eb2a07e0af79c810c47daf",
   "main": "worker.py",
   "compatibility_date": "2024-12-30",
   "compatibility_flags": ["python_workers"],
@@ -10,7 +11,7 @@
     {
       "binding": "DB",
       "database_name": "creatorspy-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_id": "89336379-3a81-4a27-a127-d92d05a528ec"
     }
   ],
 
