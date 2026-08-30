@@ -9,7 +9,14 @@ if str(ROOT_DIR) not in sys.path:
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from backend.app.main import app
+try:
+    from app.main import app
+except ImportError:
+    try:
+        from backend.app.main import app
+    except ImportError:
+        import app.main as _m
+        app = _m.app
 
 # Cloudflare Workers ASGI entrypoint
 try:
