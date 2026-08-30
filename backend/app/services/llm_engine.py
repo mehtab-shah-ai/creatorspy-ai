@@ -12,21 +12,26 @@ async def call_groq(prompt: str, system_prompt: str, api_key: str, json_mode: bo
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             }
-            body = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.3,
-            }
-            if json_mode:
-                body["response_format"] = {"type": "json_object"}
+            # Try active verified Groq models: qwen/qwen3.6-27b or openai/gpt-oss-20b
+            for model_name in ["qwen/qwen3.6-27b", "openai/gpt-oss-20b", "groq/compound-mini"]:
+                try:
+                    body = {
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.3,
+                    }
+                    if json_mode:
+                        body["response_format"] = {"type": "json_object"}
 
-            resp = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=body)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data["choices"][0]["message"]["content"]
+                    resp = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=body)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        return data["choices"][0]["message"]["content"]
+                except Exception:
+                    continue
     except Exception as e:
         print(f"[LLM Engine: Groq Warning]: {e}")
     return None
@@ -36,16 +41,21 @@ async def call_gemini(prompt: str, system_prompt: str, api_key: str) -> Optional
         return None
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-            body = {
-                "system_instruction": {"parts": [{"text": system_prompt}]},
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.3, "response_mime_type": "application/json"},
-            }
-            resp = await client.post(url, json=body)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
+            # Try active verified Gemini models: gemini-3.5-flash-lite or gemini-3.6-flash
+            for model_name in ["gemini-3.5-flash-lite", "gemini-3.6-flash"]:
+                try:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+                    body = {
+                        "system_instruction": {"parts": [{"text": system_prompt}]},
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.3, "response_mime_type": "application/json"},
+                    }
+                    resp = await client.post(url, json=body)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        return data["candidates"][0]["content"]["parts"][0]["text"]
+                except Exception:
+                    continue
     except Exception as e:
         print(f"[LLM Engine: Gemini Warning]: {e}")
     return None
