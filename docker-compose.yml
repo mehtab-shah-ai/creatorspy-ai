@@ -17,7 +17,6 @@ services:
       - .env
     volumes:
       - creatorspy-data:/app/chroma_viral_db
-      - ./competitor_intel.db:/app/competitor_intel.db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 20s

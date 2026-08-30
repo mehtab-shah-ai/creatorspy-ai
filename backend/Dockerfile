@@ -26,7 +26,6 @@ ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=production
 
 COPY backend/ ./backend/
-COPY competitor_intel.db ./competitor_intel.db
 
 EXPOSE 8000
 
