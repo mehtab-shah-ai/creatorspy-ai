@@ -9,9 +9,11 @@ import {
   AdaptedHookResponse,
 } from "./types";
 
+export const BACKEND_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace(/\/$/, "") || "https://creatorspy-backend.onrender.com";
+
 export async function fetchSampleCreators(): Promise<SampleCreatorCard[]> {
   try {
-    const res = await fetch("/api/creator/samples");
+    const res = await fetch(`${BACKEND_BASE}/api/creator/samples`);
     if (!res.ok) throw new Error("Failed to fetch sample creators");
     return await res.json();
   } catch (err) {
@@ -55,7 +57,7 @@ export async function fetchSampleCreators(): Promise<SampleCreatorCard[]> {
 }
 
 export async function fetchSampleDossier(presetId: string): Promise<ChannelDossierResponse> {
-  const res = await fetch(`/api/creator/sample/${presetId}`);
+  const res = await fetch(`${BACKEND_BASE}/api/creator/sample/${presetId}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch dossier for preset ${presetId}`);
   }
@@ -63,7 +65,7 @@ export async function fetchSampleDossier(presetId: string): Promise<ChannelDossi
 }
 
 export async function analyzeChannel(query: string): Promise<ChannelDossierResponse> {
-  const res = await fetch("/api/creator/analyze-channel", {
+  const res = await fetch(`${BACKEND_BASE}/api/creator/analyze-channel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query }),
@@ -81,7 +83,7 @@ export async function deconstructVideo(
   niche: string,
   views_multiplier: number
 ): Promise<VideoDossier> {
-  const res = await fetch("/api/creator/deconstruct-video", {
+  const res = await fetch(`${BACKEND_BASE}/api/creator/deconstruct-video`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -102,7 +104,7 @@ export async function deconstructVideo(
 // =========================================================================
 export async function loginUser(email: string, password: string): Promise<AuthResponse> {
   try {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(`${BACKEND_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -124,7 +126,7 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
 
 export async function registerUser(name: string, email: string, password: string): Promise<AuthResponse> {
   try {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetch(`${BACKEND_BASE}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),
@@ -148,7 +150,7 @@ export async function registerUser(name: string, email: string, password: string
 // PODCAST TO VIRAL REEL API CALLS
 // =========================================================================
 export async function minePodcastReel(urlOrId: string): Promise<PodcastMiningResponse> {
-  const res = await fetch("/api/creator/mine-podcast-reel", {
+  const res = await fetch(`${BACKEND_BASE}/api/creator/mine-podcast-reel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url_or_id: urlOrId }),
@@ -167,7 +169,7 @@ export async function searchHookVault(
   category?: string,
   niche?: string
 ): Promise<HookSearchResponse> {
-  const res = await fetch("/api/creator/search-hook-vault", {
+  const res = await fetch(`${BACKEND_BASE}/api/creator/search-hook-vault`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, category, niche }),
@@ -183,7 +185,7 @@ export async function adaptHookForCreator(
   userNiche: string,
   userTopic: string
 ): Promise<AdaptedHookResponse> {
-  const res = await fetch("/api/creator/adapt-hook", {
+  const res = await fetch(`${BACKEND_BASE}/api/creator/adapt-hook`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -200,7 +202,7 @@ export async function adaptHookForCreator(
 
 export async function clearStudioSession(): Promise<{ status: string; message: string }> {
   try {
-    const res = await fetch("/api/creator/clear-studio", {
+    const res = await fetch(`${BACKEND_BASE}/api/creator/clear-studio`, {
       method: "POST",
     });
     if (!res.ok) {

@@ -21,18 +21,12 @@ services:
       - key: GEMINI_API_KEY
         sync: false
 
-  # 2. Next.js Frontend Service
+  # 2. Next.js Static Frontend Site (0ms Cold Start, Never Sleeps, 100% Free Forever)
   - type: web
     name: creatorspy-frontend
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: .
-    plan: free
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/out
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: NEXT_PUBLIC_BACKEND_URL
-        fromService:
-          type: web
-          name: creatorspy-backend
-          property: url
+        value: https://creatorspy-backend.onrender.com

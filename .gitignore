@@ -23,6 +23,11 @@ pip-log.txt
 # Dependencies & Build
 node_modules/
 .next/
+out/
+frontend/out/
+backend/python_modules/
+_api_backup/
+frontend/src/app/_api_backup/
 /out/
 /build/
 /dist/

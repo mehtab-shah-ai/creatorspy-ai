@@ -41,6 +41,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "project": "CreatorSpy AI - Autonomous Viral Video Intelligence",
+        "docs": "/docs",
+        "health": "/api/health",
+        "frontend": "https://creatorspy-frontend.onrender.com"
+    }
+
 class AnalyzeChannelRequest(BaseModel):
     query: str
 
