@@ -1,49 +1,68 @@
-# 🚀 Render 1-Click Fullstack Deployment Guide
+# 🚀 CreatorSpy AI — Render Deployment Guide
 
-> **Deploy both Next.js Frontend and FastAPI Backend on Render with 1 Click, zero disk wipe issues, and 24/7 Keep-Alive.**
-
----
-
-## 🏗️ What Makes This Render Deployment Safe & Fast?
-
-1. **Self-Healing ChromaDB & SQLite**:
-   * Even if Render's free container restarts or sleeps, `rag_vault.py` **auto-seeds all viral hooks and rules in 0.2 seconds** upon boot. Zero data is lost!
-2. **Instant Demo Load (Zero Waiting for Users)**:
-   * The frontend loads instantly, and iconic creators (MKBHD, Warikoo, Jeremy) have pre-computed benchmarks that render in 0ms so users never see a blank screen.
-3. **24/7 Keep-Alive Ping (No More 50-Second Cold Starts)**:
-   * By setting up a free 10-minute heartbeat ping via UptimeRobot, Render receives traffic every 10 minutes and **never goes to sleep!**
+> **Deploy the Next.js Frontend as an Ultra-Fast Static Site (0ms Cold Start, Never Sleeps) and the FastAPI Backend as a Docker Container.**
 
 ---
 
-## 🚀 Step 1: Deploy with Render Blueprint (1-Click)
+## 🏗️ Architecture Overview
 
-1. Go to [dashboard.render.com](https://dashboard.render.com/) and log in.
-2. Click the blue **"New +"** button at the top right ➔ select **"Blueprint"**.
-3. Connect your GitHub repository: **`mehtab-shah-ai/creatorspy-ai`**.
-4. Render will automatically read `render.yaml` and show:
-   * Service 1: `creatorspy-backend` (Docker)
-   * Service 2: `creatorspy-frontend` (Docker)
-5. Under environment variables for `creatorspy-backend`, paste your API keys:
-   * `GROQ_API_KEY`: Paste your Groq API key
-   * `YOUTUBE_API_KEY`: Paste your YouTube Data API key
-6. Click **"Apply"**!
-
-Render will build both containers in parallel and give you two live URLs:
-* Backend: `https://creatorspy-backend.onrender.com`
-* Frontend: `https://creatorspy-frontend.onrender.com`
+| Component | Platform | Runtime | Features |
+| :--- | :--- | :--- | :--- |
+| **Backend API** | Render Web Service | Docker (Python 3.12 + FastAPI) | Self-healing ChromaDB vector store, 4-tier LLM fallback, YouTube Data API v3 |
+| **Frontend UI** | Render Static Site | Next.js Static HTML Export (`out/`) | **0ms cold start, never sleeps**, instant CDN delivery, dark obsidian aesthetic |
 
 ---
 
-## ⚡ Step 2: Keep Render Awake 24/7 (Prevent Cold Starts)
+## 🚀 Part 1: Deploy Backend (Web Service)
 
-To ensure Render never goes to sleep when a recruiter visits:
+1. Go to [dashboard.render.com](https://dashboard.render.com/) ➔ Click **"New +"** ➔ **"Web Service"**.
+2. Connect your GitHub repository: `mehtab-shah-ai/creatorspy-ai`.
+3. Configure settings:
+   * **Name:** `creatorspy-backend`
+   * **Language:** `Docker`
+   * **Dockerfile Path:** `./backend/Dockerfile`
+   * **Plan:** `Free ($0/month)`
+4. Add Environment Variables (from `.env.example`):
+   * `GROQ_API_KEY`: Your Groq Cloud API Key
+   * `GROQ_API_KEY_FALLBACK`: Your Backup Groq Key
+   * `GEMINI_API_KEY`: Your Google Gemini API Key
+   * `GEMINI_API_KEY_FALLBACK`: Your Backup Gemini Key
+   * `YOUTUBE_API_KEY`: Your YouTube Data API v3 Key
+   * `SERPER_API_KEY`: Your Serper Search Key
+   * `ENVIRONMENT`: `production`
+   * `SECRET_KEY`: Any secure string
+5. Click **"Deploy web service"**.
+   * Live API will be at: `https://creatorspy-backend.onrender.com`
+   * Test health: `https://creatorspy-backend.onrender.com/api/health`
+   * Swagger docs: `https://creatorspy-backend.onrender.com/docs`
+
+---
+
+## ⚡ Part 2: Deploy Frontend (Static Site — 0ms Cold Start)
+
+1. On Render, click **"New +"** ➔ **"Static Site"**.
+2. Connect your GitHub repository: `mehtab-shah-ai/creatorspy-ai`.
+3. Configure settings:
+   * **Name:** `creatorspy-ai` (gives you `https://creatorspy-ai.onrender.com`)
+   * **Root Directory:** `frontend`
+   * **Build Command:** `npm run build`
+   * **Publish Directory:** `out`
+4. Click **"Create Static Site"**.
+   * Deploys in ~20 seconds!
+   * Serves instantly from Render's global CDN with zero cold starts!
+
+---
+
+## 🛡️ Part 3: Keep Backend Awake 24/7 (Prevent Render Sleep)
+
+Render free backend instances spin down after 15 minutes of inactivity. Set up a free 10-minute heartbeat ping so your backend never sleeps:
 
 1. Go to [uptimerobot.com](https://uptimerobot.com/) (100% Free).
 2. Click **"Add New Monitor"**:
    * **Monitor Type:** `HTTP(s)`
-   * **Friendly Name:** `CreatorSpy Backend Keepalive`
+   * **Friendly Name:** `CreatorSpy Backend Heartbeat`
    * **URL:** `https://creatorspy-backend.onrender.com/api/health`
    * **Monitoring Interval:** `Every 10 minutes`
 3. Click **"Create Monitor"**.
 
-🎉 **Done!** Every 10 minutes, UptimeRobot sends a tiny ping to `/api/health`. Render sees active traffic and **stays awake 24/7 with zero cold starts!**
+🎉 **Done!** Render receives a heartbeat ping every 10 minutes, keeping your backend hot and ready 24/7 with zero lag for any visitor or recruiter!
